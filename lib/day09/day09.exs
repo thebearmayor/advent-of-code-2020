@@ -33,19 +33,20 @@ defmodule Day09 do
 
   def contiguous_helper(numbers, target, start) do
     addends = Enum.slice(numbers, start..-1)
-    reducer = fn(n, sum) ->
-      sum = n + sum
+    reducer = fn(n, set) ->
+      set = MapSet.put(set, n)
+      sum = Enum.sum(set)
       cond do
-        sum < target -> {:cont, sum}
-        sum == target -> {:halt, n}
+        sum < target -> {:cont, set}
+        sum == target -> {:halt, set}
         sum > target -> {:halt, false}
       end
     end
-    res = Enum.reduce_while(addends, 0, reducer)
+    res = Enum.reduce_while(addends, MapSet.new, reducer)
     if res do
-      first = Enum.at(numbers, start) |> IO.inspect(label: "first: ")
-      last = res |> IO.inspect(label: "last: ")
-      first + last
+      min = Enum.min(res) |> IO.inspect(label: "min: ")
+      max = Enum.max(res) |> IO.inspect(label: "max: ")
+      min + max |> IO.inspect(label: "total: ")
     else
       # This does not give the correct answer. I misunderstood smallest/largest for first/last.
       contiguous_helper(numbers, target, start + 1)
