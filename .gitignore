@@ -22,7 +22,7 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-aoc2020-*.tar
+advent_of_code-*.tar
 
 
 # Temporary files for e.g. tests
