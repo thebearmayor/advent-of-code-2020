@@ -80,14 +80,6 @@ aoc 2020, 12 do
     {ship, {y, x - val}}
   end
 
-  def movew({"R", val}, {ship, {y, x} = _point}) do
-    case div(val, 90) do
-      1 -> {ship, {-x, y}}
-      2 -> {ship, {-y, -x}}
-      3 -> {ship, {x, -y}}
-    end
-  end
-
   def movew({"R", 90}, {ship, {y, x} = _point}) do
     {ship, {-x, y}}
   end
