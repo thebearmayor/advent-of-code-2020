@@ -79,11 +79,11 @@ aoc 2020, 11 do
   end
 
   def find_visible_neighbor(seat, layout, dir) do
-    Stream.iterate(seat, dir)
-    |> Stream.drop(1)
-    |> Stream.take_while(&Map.has_key?(layout, &1))
-    |> Stream.map(&layout[&1])
-    |> Enum.find(:unoccupied, &(&1 == :occupied or &1 == :unoccupied))
+    case layout[dir.(seat)] do
+      :floor -> find_visible_neighbor(dir.(seat), layout, dir)
+      nil -> nil
+      x -> x
+    end
   end
 
   defp count_occupied(seats), do: Enum.count(seats, fn seat -> seat == :occupied end)
