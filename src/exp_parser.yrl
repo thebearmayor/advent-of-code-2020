@@ -1,9 +1,9 @@
-Nonterminals E T F.
+Nonterminals E.
 Terminals int '+' '*' '(' ')'.
 Rootsymbol E.
-E -> E '+' T      : {plus, '$1', '$3'}.
-E -> T            : '$1'.
-E -> E '*' T      : {mult, '$1', '$3'}.
-T -> F            : '$1'.
-F -> '(' E ')'    : '$2'.
-F -> int          : '$1'. 
+Left 100 '+'.
+Left 100 '*'.
+E -> E '+' E      : {plus, '$1', '$3'}.
+E -> E '*' E      : {mult, '$1', '$3'}.
+E -> '(' E ')'    : '$2'.
+E -> int          : '$1'. 
