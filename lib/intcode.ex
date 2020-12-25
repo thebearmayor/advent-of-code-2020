@@ -49,8 +49,6 @@ defmodule Intcode do
 
   def get_params(%{pos: pos} = opcodes, modes, count) do
     pos + 1..pos + count
-    # |> Enum.with_index()
-    # |> Enum.map(fn {param, i} -> {param, Enum.at(modes, i, 0)} end) # Horseshit Enum.zip
     |> Stream.zip(Stream.concat(modes, Stream.repeatedly(fn -> 0 end)))
     # |> IO.inspect()
     |> Enum.map(fn {pos, mode} ->

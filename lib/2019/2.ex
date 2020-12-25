@@ -2,27 +2,26 @@ import AOC
 
 aoc 2019, 2 do
   def p1 do
-    input_string()
-    |> Intcode.parse_string()
-    |> Map.put(1, 12)
-    |> Map.put(2, 2)
-    |> Intcode.run(0)
-    |> Map.get(0)
+    test(12, 2)
+  end
+
+  def test(noun, verb) do
+    {:ok, pid} = IntcodeServer.start_link(input_string())
+    IntcodeServer.set(pid, 1, noun)
+    IntcodeServer.set(pid, 2, verb)
+    IntcodeServer.run(pid)
+    {:ok, res} = IntcodeServer.get(pid, 0)
+    res
   end
 
   def p2 do
-    mem = input_string() |> Intcode.parse_string()
-    out =
+    {_, noun, verb} =
       for noun <- 0..99,
           verb <- 0..99 do
-        res = mem
-        |> Map.put(1, noun)
-        |> Map.put(2, verb)
-        |> Intcode.run(0)
-        {res, noun, verb}
+        {test(noun, verb), noun, verb}
       end
-    out
-    |> Enum.find(fn {mem, _noun, _verb} -> mem[0] == 19690720 end)
-    |> (fn {_mem, noun, verb} -> (100 * noun) + verb end).()
+      |> Enum.find(fn {res, _noun, _verb} -> res == 19_690_720 end)
+
+    100 * noun + verb
   end
 end

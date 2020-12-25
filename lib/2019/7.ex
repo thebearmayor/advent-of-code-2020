@@ -2,46 +2,40 @@ import AOC
 
 aoc 2019, 7 do
   def p1 do
-    program = input_string()
-
     phases =
       for a <- 0..4,
           b <- 0..4,
           c <- 0..4,
           d <- 0..4,
           e <- 0..4,
-          MapSet.new([a, b, c, d, e]) == MapSet.new(0..4),
-          do: run_all({a, b, c, d, e}, program)
+          MapSet.new([a, b, c, d, e]) == MapSet.new(0..4) do
+            run_servers([a, b, c, d, e])
+          end
 
     phases
     |> Enum.max()
   end
 
-  def run_amp(input, phase, program \\ input_string()) do
-    IO.inspect(input, label: "input")
-    IO.inspect(phase, label: "phase")
-    intcode = Intcode.parse_string(program)
-
-    intcode
-    |> Intcode.input(phase)
-    |> Intcode.input(input)
-    |> Intcode.run()
-    |> Intcode.output()
-    |> Qex.first!()
+  def run_servers([a, b, c, d, e]) do
+    [ia, ib, ic, id, ie] =
+      [a, b, c, d, e]
+      |> Enum.map(fn phase ->
+        {:ok, pid} = IntcodeServer.start_link(input_string())
+        IntcodeServer.input(pid, phase)
+        pid
+      end)
+    IntcodeServer.input(ia, 0)
+    IntcodeServer.register_input(ia, fn -> IntcodeServer.output(ie) end)
+    IntcodeServer.register_input(ib, fn -> IntcodeServer.output(ia) end)
+    IntcodeServer.register_input(ic, fn -> IntcodeServer.output(ib) end)
+    IntcodeServer.register_input(id, fn -> IntcodeServer.output(ic) end)
+    IntcodeServer.register_input(ie, fn -> IntcodeServer.output(id) end)
+    [ia, ib, ic, id, ie]
+    |> Enum.map(&IntcodeServer.run/1)
+    IntcodeServer.output(ie)
   end
 
-  def run_all({a, b, c, d, e}, program) do
-    run_amp(0, a, program)
-    |> run_amp(b, program)
-    |> run_amp(c, program)
-    |> run_amp(d, program)
-    |> run_amp(e, program)
-  end
-
-  # def input_string,
-  #   do:
-  #     "3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10"
-
+# TODO: wire them up together
   def p2 do
     phases =
       for a <- 5..9,
