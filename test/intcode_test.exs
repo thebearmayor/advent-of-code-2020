@@ -155,4 +155,69 @@ defmodule IntcodeTest do
     expected = 11
     assert Intcode.fetch(intcode, 6) == expected
   end
+
+  test "stores input" do
+    intcode = Intcode.new("3,50")
+    input = 2345
+    expected = input
+    actual =
+      intcode
+      |> Intcode.input(input)
+      |> Intcode.step()
+      |> Intcode.fetch(50)
+    assert actual == expected
+  end
+
+  test "produces output" do
+    intcode = Intcode.new("4,50")
+    output = 5678
+    expected = output
+    {{:value, actual}, _} =
+      intcode
+      |> Intcode.store(50, output)
+      |> Intcode.step()
+      |> Intcode.output
+
+    assert actual == expected
+  end
+
+  test "interprets parameter modes" do
+    intcode = Intcode.new("1002,4,3,4,33")
+    expected = 99
+    actual =
+      intcode
+      |> Intcode.run()
+      |> Intcode.fetch(4)
+
+    assert actual == expected
+  end
+
+  test "jumps" do
+    # output 0 if input is 0
+    intcode = Intcode.new("3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9")
+    {{:value, actual}, _} = intcode
+    |> Intcode.input(0)
+    |> Intcode.run()
+    |> Intcode.output()
+    assert actual == 0
+
+  end
+
+  test "jumps and comparisons" do
+    intcode = Intcode.new("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99")
+
+    # output 999 if input less than 8
+    {{:value, actual}, _} = intcode
+    |> Intcode.input(6)
+    |> Intcode.run()
+    |> Intcode.output()
+    assert actual == 999
+
+    # output 1001 if input greater than 8
+    {{:value, actual}, _} = intcode
+    |> Intcode.input(20)
+    |> Intcode.run()
+    |> Intcode.output()
+    assert actual == 1001
+  end
 end
