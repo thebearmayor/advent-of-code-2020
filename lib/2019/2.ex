@@ -6,21 +6,30 @@ aoc 2019, 2 do
   end
 
   def test(noun, verb) do
-    {:ok, pid} = IntcodeServer.start_link(input_string())
-    IntcodeServer.set(pid, 1, noun)
-    IntcodeServer.set(pid, 2, verb)
-    IntcodeServer.run(pid)
-    {:ok, res} = IntcodeServer.get(pid, 0)
-    res
+    Intcode.new(input_string())
+    |> Intcode.store(1, noun)
+    |> Intcode.store(2, verb)
+    |> Intcode.run()
+    |> Intcode.fetch(0)
   end
 
   def p2 do
-    {_, noun, verb} =
-      for noun <- 0..99,
-          verb <- 0..99 do
-        {test(noun, verb), noun, verb}
-      end
-      |> Enum.find(fn {res, _noun, _verb} -> res == 19_690_720 end)
+    # {noun, verb} =
+    #   for noun <- 0..99,
+    #       verb <- 0..99,
+    #       test(noun, verb) == 19_690_720 do
+    #       {noun, verb}
+    #   end
+    #   |> List.first
+    {noun, verb} =
+      Stream.flat_map(
+        0..99,
+        fn n ->
+          Stream.flat_map(0..99, fn v ->
+            [{n, v}]
+          end)
+        end)
+        |> Enum.find(fn {n, v} -> test(n, v) == 19_690_720 end)
 
     100 * noun + verb
   end
