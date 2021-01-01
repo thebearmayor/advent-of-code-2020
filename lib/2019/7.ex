@@ -2,88 +2,50 @@ import AOC
 
 aoc 2019, 7 do
   def p1 do
-    phases =
-      for a <- 0..4,
-          b <- 0..4,
-          c <- 0..4,
-          d <- 0..4,
-          e <- 0..4,
-          MapSet.new([a, b, c, d, e]) == MapSet.new(0..4) do
-            run_servers([a, b, c, d, e])
-          end
-
-    phases
+    (for [a, b, c, d, e] <- permute(Enum.into(0..4, [])), do: run_servers([a, b, c, d, e]))
     |> Enum.max()
   end
 
-  def run_servers([a, b, c, d, e]) do
-    [ia, ib, ic, id, ie] =
-      [a, b, c, d, e]
-      |> Enum.map(fn phase ->
-        {:ok, pid} = IntcodeServer.start_link(input_string())
-        IntcodeServer.input(pid, phase)
-        pid
-      end)
-    IntcodeServer.input(ia, 0)
-    IntcodeServer.register_input(ia, fn -> IntcodeServer.output(ie) end)
-    IntcodeServer.register_input(ib, fn -> IntcodeServer.output(ia) end)
-    IntcodeServer.register_input(ic, fn -> IntcodeServer.output(ib) end)
-    IntcodeServer.register_input(id, fn -> IntcodeServer.output(ic) end)
-    IntcodeServer.register_input(ie, fn -> IntcodeServer.output(id) end)
-    [ia, ib, ic, id, ie]
-    |> Enum.map(&IntcodeServer.run/1)
-    IntcodeServer.output(ie)
+  def permute([]), do: [[]]
+  def permute(list) do
+    for x <- list, y <- permute(list -- [x]), do: [x|y]
   end
 
-# TODO: wire them up together
+  def run_servers(phases) do
+    [a, b, c, d, e] = Enum.map(phases, & Intcode.new(input_string()) |> Intcode.input(&1))
+    # a = Intcode.input(a, 0)
+    {{:value, outa}, _} = Intcode.input(a, 0) |> Intcode.run() |> Intcode.output()
+    {{:value, outb}, _} = Intcode.input(b, outa) |> Intcode.run() |> Intcode.output()
+    {{:value, outc}, _} = Intcode.input(c, outb) |> Intcode.run() |> Intcode.output()
+    {{:value, outd}, _} = Intcode.input(d, outc) |> Intcode.run() |> Intcode.output()
+    {{:value, oute}, _} = Intcode.input(e, outd) |> Intcode.run() |> Intcode.output()
+    oute
+  end
+
   def p2 do
-    phases =
-      for a <- 5..9,
-          b <- 5..9,
-          c <- 5..9,
-          d <- 5..9,
-          e <- 5..9,
-          MapSet.new([a, b, c, d, e]) == MapSet.new(5..9) do
-        [a, b, c, d, e] |> Enum.map(&init/1) |> List.to_tuple()
-      end
-
-    phases
-    |> Enum.map(fn {a, b, c, d, e} ->
-      a = Intcode.input(a, 0)
-      run({a, b, c, d, e})
-    end)
+    (for [a, b, c, d, e] <- permute(Enum.into(5..9, [])), do: loop_servers([a, b, c, d, e]))
     |> Enum.max()
   end
 
-  def run({a, b, c, d, e}) do
-    a = Intcode.run(a)
-    {out, a} = Intcode.output(a)
-    b = Intcode.input(b, out)
-    b = Intcode.run(b)
-    {out, b} = Intcode.output(b)
-    c = Intcode.input(c, out)
-    c = Intcode.run(c)
-    {out, c} = Intcode.output(c)
-    d = Intcode.input(d, out)
-    d = Intcode.run(d)
-    {out, d} = Intcode.output(d)
-    e = Intcode.input(e, out)
-    e = Intcode.run(e)
-    {out, e} = Intcode.output(e)
-
-    case Intcode.state(e) do
-      :halted ->
-        out
-
-      _ ->
-        a = Intcode.input(a, out)
-        run({a, b, c, d, e})
-    end
+  def loop_servers(phases) do
+    [a, b, c, d, e] = Enum.map(phases, & Intcode.new(input_string()) |> Intcode.input(&1))
+    a = Intcode.input(a, 0)
+    loop_servers_([a, b, c, d, e])
   end
 
-  def init(phase, program \\ input_string()) do
-    program
-    |> Intcode.parse_string()
-    |> Intcode.input(phase)
+  def loop_servers_([a, b, c, d, e]) do
+    {{:value, outa}, a} = Intcode.run(a) |> Intcode.output()
+    {{:value, outb}, b} = Intcode.input(b, outa) |> Intcode.run() |> Intcode.output()
+    {{:value, outc}, c} = Intcode.input(c, outb) |> Intcode.run() |> Intcode.output()
+    {{:value, outd}, d} = Intcode.input(d, outc) |> Intcode.run() |> Intcode.output()
+    {{:value, oute}, e} = Intcode.input(e, outd) |> Intcode.run() |> Intcode.output()
+
+    case Intcode.halted?(e) do
+      false ->
+        a = Intcode.input(a, oute)
+        loop_servers_([a, b, c, d, e])
+      true ->
+        oute
+    end
   end
 end

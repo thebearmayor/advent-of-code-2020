@@ -1,10 +1,11 @@
 defmodule Intcode do
-  defstruct opcodes: %{}, pos: 0, state: :init, input: Qex.new(), output: Qex.new(), debug: false
+  defstruct opcodes: %{}, pos: 0, rel: 0, state: :init, input: Qex.new(), output: Qex.new(), debug: false
 
   @opaque t :: %__MODULE__{
             opcodes: %{
               opcodes: %{integer => integer},
               pos: integer,
+              rel: integer,
               state: atom,
               input: Qex.t(),
               output: Qex.t(),
@@ -27,6 +28,7 @@ defmodule Intcode do
 
   @spec run(Intcode.t()) :: Intcode.t()
   def run(%Intcode{state: :halt} = intcode), do: intcode
+  def run(%Intcode{state: :wait} = intcode), do: %{intcode | state: :run}
   def run(%Intcode{state: :init} = intcode), do: %{intcode | state: :run} |> run
   def run(intcode), do: intcode |> step |> run
 
@@ -44,6 +46,7 @@ defmodule Intcode do
       6 -> unary_jump(intcode, &(&1 == 0))
       7 -> binary_op_and_store(intcode, &if(&1 < &2, do: 1, else: 0))
       8 -> binary_op_and_store(intcode, &if(&1 == &2, do: 1, else: 0))
+      9 -> set_rel(intcode)
       99 -> halt(intcode)
     end
   end
@@ -71,11 +74,15 @@ defmodule Intcode do
     op_size = 2
     tgt = opcodes[pos + 1]
 
-    {{:value, val}, input} = Qex.pop(intcode.input)
+    case Qex.pop(intcode.input) do
+      {:empty, _} ->
+        %{intcode | state: :wait}
 
-    %{intcode | input: input}
-    |> store(tgt, val)
-    |> advance(op_size)
+      {{:value, val}, input} ->
+        %{intcode | input: input}
+        |> store(tgt, val)
+        |> advance(op_size)
+    end
   end
 
   @spec fetch_output(Intcode.t()) :: Intcode.t()
@@ -88,6 +95,13 @@ defmodule Intcode do
     |> advance(op_size)
   end
 
+  def set_rel(intcode) do
+    op_size = 2
+    val = params(intcode, intcode.pos + 1)
+    %{intcode | rel: intcode.rel + val}
+    |> advance(op_size)
+  end
+
   @spec halt(Intcode.t()) :: Intcode.t()
   def halt(intcode) do
     %{intcode | state: :halt}
@@ -96,7 +110,7 @@ defmodule Intcode do
   @spec params(Intcode.t(), integer | Enum.t()) :: integer | list(integer)
   def params(intcode, loc) when is_integer(loc), do: List.first(params(intcode, [loc]))
 
-  def params(%Intcode{pos: pos, opcodes: opcodes} = intcode, locs) do
+  def params(%Intcode{pos: pos, rel: rel, opcodes: opcodes} = intcode, locs) do
     modes =
       opcodes[pos]
       |> div(100)
@@ -113,6 +127,10 @@ defmodule Intcode do
 
         1 ->
           intcode.opcodes[loc]
+
+        2 ->
+          addr = intcode.opcodes[loc] + rel
+          intcode.opcodes[addr]
       end
     end)
   end
@@ -147,6 +165,10 @@ defmodule Intcode do
     val = Enum.into(intcode.output, [])
     {{:value, val}, %{intcode | output: Qex.new()}}
   end
+
+  @spec halted?(Intcode.t()) :: boolean()
+  def halted?(%{state: :halt}), do: true
+  def halted?(_), do: false
 
   defimpl String.Chars do
     def to_string(intcode) do
