@@ -1,16 +1,20 @@
 defmodule Intcode do
-  defstruct opcodes: %{}, pos: 0, rel: 0, state: :init, input: Qex.new(), output: Qex.new(), debug: false
+  defstruct opcodes: %{},
+            pos: 0,
+            rel: 0,
+            state: :init,
+            input: Qex.new(),
+            output: Qex.new(),
+            debug: false
 
   @opaque t :: %__MODULE__{
-            opcodes: %{
-              opcodes: %{integer => integer},
-              pos: integer,
-              rel: integer,
-              state: atom,
-              input: Qex.t(),
-              output: Qex.t(),
-              debug: boolean
-            }
+            opcodes: %{integer => integer},
+            pos: integer,
+            rel: integer,
+            state: atom,
+            input: Qex.t(),
+            output: Qex.t(),
+            debug: boolean
           }
 
   @spec new(binary) :: Intcode.t()
@@ -25,6 +29,9 @@ defmodule Intcode do
 
     %Intcode{opcodes: opcodes}
   end
+
+  @spec debug(Intcode.t()) :: Intcode.t()
+  def debug(intcode), do: %{intcode | debug: true}
 
   @spec run(Intcode.t()) :: Intcode.t()
   def run(%Intcode{state: :halt} = intcode), do: intcode
@@ -54,8 +61,9 @@ defmodule Intcode do
   @spec binary_op_and_store(Intcode.t(), (integer, integer -> integer)) :: Intcode.t()
   def binary_op_and_store(%Intcode{pos: pos} = intcode, fun) when is_function(fun) do
     op_size = 4
-    [op1, op2] = params(intcode, (pos + 1)..(pos + 2))
-    tgt = intcode.opcodes[pos + 3]
+    [addr1, addr2, tgt] = get_addr(intcode, (pos + 1)..(pos + 3))
+    op1 = get_val(intcode, addr1)
+    op2 = get_val(intcode, addr2)
 
     intcode
     |> store(tgt, fun.(op1, op2))
@@ -65,14 +73,15 @@ defmodule Intcode do
   @spec unary_jump(Intcode.t(), (integer -> boolean)) :: Intcode.t()
   def unary_jump(%Intcode{pos: pos} = intcode, fun) when is_function(fun) do
     op_size = 3
-    [op1, op2] = params(intcode, (pos + 1)..(pos + 2))
+    [addr1, addr2] = get_addr(intcode, (pos + 1)..(pos + 2))
+    [op1, op2] = Enum.map([addr1, addr2], &get_val(intcode, &1))
     if fun.(op1), do: jump(intcode, op2), else: advance(intcode, op_size)
   end
 
   @spec store_input(Intcode.t()) :: Intcode.t()
-  def store_input(%Intcode{pos: pos, opcodes: opcodes} = intcode) do
+  def store_input(%Intcode{pos: pos, opcodes: _opcodes} = intcode) do
     op_size = 2
-    tgt = opcodes[pos + 1]
+    tgt = get_addr(intcode, pos + 1)
 
     case Qex.pop(intcode.input) do
       {:empty, _} ->
@@ -86,19 +95,23 @@ defmodule Intcode do
   end
 
   @spec fetch_output(Intcode.t()) :: Intcode.t()
-  def fetch_output(intcode) do
+  def fetch_output(%Intcode{pos: pos, output: output} = intcode) do
     op_size = 2
-    val = params(intcode, intcode.pos + 1)
-    output = Qex.push(intcode.output, val)
+    addr = get_addr(intcode, pos + 1)
+    val = get_val(intcode, addr)
+    output = Qex.push(output, val)
 
     %{intcode | output: output}
     |> advance(op_size)
   end
 
-  def set_rel(intcode) do
+  @spec set_rel(Intcode.t()) :: Intcode.t()
+  def set_rel(%Intcode{pos: pos, rel: rel} = intcode) do
     op_size = 2
-    val = params(intcode, intcode.pos + 1)
-    %{intcode | rel: intcode.rel + val}
+    addr = get_addr(intcode, pos + 1)
+    val = get_val(intcode, addr)
+
+    %{intcode | rel: rel + val}
     |> advance(op_size)
   end
 
@@ -107,10 +120,10 @@ defmodule Intcode do
     %{intcode | state: :halt}
   end
 
-  @spec params(Intcode.t(), integer | Enum.t()) :: integer | list(integer)
-  def params(intcode, loc) when is_integer(loc), do: List.first(params(intcode, [loc]))
+  @spec get_addr(Intcode.t(), integer | Enum.t()) :: integer | list(integer)
+  def get_addr(intcode, loc) when is_integer(loc), do: List.first(get_addr(intcode, [loc]))
 
-  def params(%Intcode{pos: pos, rel: rel, opcodes: opcodes} = intcode, locs) do
+  def get_addr(%Intcode{pos: pos, rel: rel, opcodes: opcodes}, locs) do
     modes =
       opcodes[pos]
       |> div(100)
@@ -122,18 +135,20 @@ defmodule Intcode do
     |> Enum.map(fn {loc, mode} ->
       case mode do
         0 ->
-          addr = intcode.opcodes[loc]
-          intcode.opcodes[addr]
+          opcodes[loc]
 
         1 ->
-          intcode.opcodes[loc]
+          loc
 
         2 ->
-          addr = intcode.opcodes[loc] + rel
-          intcode.opcodes[addr]
+          opcodes[loc] + rel
       end
     end)
   end
+
+  @spec get_val(Intcode.t(), integer) :: integer
+  def get_val(%Intcode{opcodes: opcodes}, addr) when is_integer(addr),
+    do: Map.get(opcodes, addr, 0)
 
   @spec store(Intcode.t(), integer, integer) :: Intcode.t()
   def store(intcode, tgt, val) when is_integer(tgt) and is_integer(val) do
@@ -172,13 +187,14 @@ defmodule Intcode do
 
   defimpl String.Chars do
     def to_string(intcode) do
-      intcode.opcodes
-      |> Enum.sort()
-      |> Enum.map(fn {pos, val} ->
-        val = Integer.to_string(val)
-        if pos == intcode.pos, do: IO.ANSI.format([:bright, :yellow, val]), else: val
-      end)
-      |> Enum.join(",")
+      (intcode.opcodes
+       |> Enum.sort()
+       |> Enum.map(fn {pos, val} ->
+         val = Integer.to_string(val)
+         if pos == intcode.pos, do: IO.ANSI.format([:bright, :yellow, val]), else: val
+       end)
+       |> Enum.join(",")) <>
+        " rel: #{intcode.rel} output: #{inspect(intcode.output)} input: #{inspect(intcode.input)}"
     end
   end
 end
