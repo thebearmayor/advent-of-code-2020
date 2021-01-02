@@ -35,7 +35,7 @@ defmodule Intcode do
 
   @spec run(Intcode.t()) :: Intcode.t()
   def run(%Intcode{state: :halt} = intcode), do: intcode
-  def run(%Intcode{state: :wait} = intcode), do: %{intcode | state: :run}
+  def run(%Intcode{state: :wait} = intcode), do: %{intcode | state: :ready}
   def run(%Intcode{state: :init} = intcode), do: %{intcode | state: :run} |> run
   def run(intcode), do: intcode |> step |> run
 
